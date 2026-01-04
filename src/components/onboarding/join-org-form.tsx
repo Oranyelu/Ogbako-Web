@@ -1,0 +1,160 @@
+'use client';
+
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+import { useAuthStore, Organization } from '@/store/use-auth-store';
+
+import { Button } from '@/components/ui/button';
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+    FormDescription,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
+
+const formSchema = z.object({
+    joinCode: z.string().length(6, {
+        message: 'Join code must be exactly 6 characters.',
+    }),
+});
+
+export function JoinOrgForm() {
+    const router = useRouter();
+    const { setOrganizations, setActiveOrg, organizations, user } = useAuthStore();
+    const [isLoading, setIsLoading] = useState(false);
+
+    const form = useForm<z.infer<typeof formSchema>>({
+        resolver: zodResolver(formSchema),
+        defaultValues: {
+            joinCode: '',
+        },
+    });
+
+    async function onSubmit(values: z.infer<typeof formSchema>) {
+        if (!user) {
+            alert("You must be logged in to join an organization.");
+            return;
+        }
+        setIsLoading(true);
+        const supabase = createClient();
+
+        try {
+            // 1. Find Organization by Code
+            const { data: orgs, error: fetchError } = await supabase
+                .from('organizations')
+                .select('*')
+                .eq('join_code', values.joinCode.toUpperCase()); // Ensure case matching
+
+            if (fetchError) throw fetchError;
+
+            if (!orgs || orgs.length === 0) {
+                form.setError('joinCode', { message: 'Invalid join code. Organization not found.' });
+                setIsLoading(false);
+                return;
+            }
+
+            const targetOrg = orgs[0];
+
+            // 2. Check if already a member
+            const { data: existingMember, error: memberCheckError } = await supabase
+                .from('organization_members')
+                .select('*')
+                .eq('organization_id', targetOrg.id)
+                .eq('user_id', user.id)
+                .single();
+
+            if (existingMember) {
+                alert("You are already a member of this organization.");
+                setIsLoading(false);
+                return;
+            }
+
+            // 3. Add user as member (Role: MEMBER)
+            const { error: joinError } = await supabase
+                .from('organization_members')
+                .insert({
+                    organization_id: targetOrg.id,
+                    user_id: user.id,
+                    role: 'MEMBER'
+                });
+
+            if (joinError) throw joinError;
+
+            // 4. Update Store and Redirect
+            const newOrg: Organization = {
+                id: targetOrg.id,
+                name: targetOrg.name,
+                slug: targetOrg.slug,
+                role: 'MEMBER'
+            };
+
+            const updatedOrgs = [...organizations, newOrg];
+            setOrganizations(updatedOrgs);
+            setActiveOrg(targetOrg.id);
+
+            router.push('/dashboard');
+        } catch (error: any) {
+            console.error("Failed to join organization:", error);
+            alert("Failed to join organization: " + error.message);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Join Organization</CardTitle>
+                <CardDescription>
+                    Enter the 6-character access code provided by your admin.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="joinCode"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Access Code</FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            placeholder="A1B2C3"
+                                            {...field}
+                                            onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                        />
+                                    </FormControl>
+                                    <FormDescription>
+                                        Ask your organization admin for this code.
+                                    </FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <Button type="submit" className="w-full" disabled={isLoading}>
+                            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Join Organization
+                        </Button>
+                    </form>
+                </Form>
+            </CardContent>
+        </Card>
+    );
+}
