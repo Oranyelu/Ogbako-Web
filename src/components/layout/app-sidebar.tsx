@@ -43,6 +43,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const role = shouldShowSidebar ? getActiveOrgRole() : null;
 
     // Define Navigation Items (Standardized)
+    // Define Navigation Items (Standardized)
     const navItems = [
         {
             title: 'Dashboard',
@@ -81,6 +82,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             items: [
                 { title: 'General', url: '/dashboard/settings' },
                 { title: 'Billing', url: '/dashboard/settings/billing' },
+            ],
+        },
+        {
+            title: 'Admin',
+            url: '/dashboard/admin',
+            icon: Command,
+            requiredRole: ['OWNER', 'ADMIN'],
+            items: [
+                { title: 'Invitations', url: '/dashboard/admin/codes' },
+                { title: 'Manage Dues', url: '/dashboard/admin/dues' },
+                { title: 'Defaulters', url: '/dashboard/admin/defaulters' },
+                { title: 'Broadcasts', url: '/dashboard/admin/notifications' },
             ],
         },
     ];

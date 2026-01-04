@@ -29,8 +29,8 @@ import {
 import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
-    joinCode: z.string().length(6, {
-        message: 'Join code must be exactly 6 characters.',
+    joinCode: z.string().min(6, {
+        message: 'Join code must be at least 6 characters.',
     }),
 });
 
@@ -55,63 +55,44 @@ export function JoinOrgForm() {
         const supabase = createClient();
 
         try {
-            // 1. Find Organization by Code
-            const { data: orgs, error: fetchError } = await supabase
+            // Call the secure RPC function to redeem the code
+            const { data, error } = await supabase
+                .rpc('redeem_invite_code', { _code: values.joinCode.toUpperCase() });
+
+            if (error) throw error;
+
+            if (!data.success) {
+                form.setError('joinCode', { message: data.message });
+                setIsLoading(false);
+                return;
+            }
+
+            // Success: Fetch the organization details to update store
+            const { data: org, error: orgError } = await supabase
                 .from('organizations')
                 .select('*')
-                .eq('join_code', values.joinCode.toUpperCase()); // Ensure case matching
-
-            if (fetchError) throw fetchError;
-
-            if (!orgs || orgs.length === 0) {
-                form.setError('joinCode', { message: 'Invalid join code. Organization not found.' });
-                setIsLoading(false);
-                return;
-            }
-
-            const targetOrg = orgs[0];
-
-            // 2. Check if already a member
-            const { data: existingMember, error: memberCheckError } = await supabase
-                .from('organization_members')
-                .select('*')
-                .eq('organization_id', targetOrg.id)
-                .eq('user_id', user.id)
+                .eq('id', data.organization_id)
                 .single();
 
-            if (existingMember) {
-                alert("You are already a member of this organization.");
-                setIsLoading(false);
-                return;
-            }
+            if (orgError) throw orgError;
 
-            // 3. Add user as member (Role: MEMBER)
-            const { error: joinError } = await supabase
-                .from('organization_members')
-                .insert({
-                    organization_id: targetOrg.id,
-                    user_id: user.id,
-                    role: 'MEMBER'
-                });
-
-            if (joinError) throw joinError;
-
-            // 4. Update Store and Redirect
+            // Update Store and Redirect
             const newOrg: Organization = {
-                id: targetOrg.id,
-                name: targetOrg.name,
-                slug: targetOrg.slug,
-                role: 'MEMBER'
+                id: org.id,
+                name: org.name,
+                slug: org.slug,
+                role: 'MEMBER' // Default, though RPC might assign different
             };
 
             const updatedOrgs = [...organizations, newOrg];
             setOrganizations(updatedOrgs);
-            setActiveOrg(targetOrg.id);
+            setActiveOrg(org.id);
 
             router.push('/dashboard');
+
         } catch (error: any) {
             console.error("Failed to join organization:", error);
-            alert("Failed to join organization: " + error.message);
+            form.setError('joinCode', { message: 'An unexpected error occurred. Please try again.' });
         } finally {
             setIsLoading(false);
         }

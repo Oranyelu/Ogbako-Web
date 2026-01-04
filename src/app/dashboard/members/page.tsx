@@ -8,7 +8,7 @@ import { DataTable } from "./data-table"
 import { Loader2 } from "lucide-react"
 
 export default function MembersPage() {
-    const { activeOrgId } = useAuthStore()
+    const { activeOrgId, user } = useAuthStore()
     const [data, setData] = useState<Member[]>([])
     const [isLoading, setIsLoading] = useState(true)
 
@@ -18,16 +18,12 @@ export default function MembersPage() {
             setIsLoading(true);
             const supabase = createClient();
 
-            // Fetch members and join with profiles (assuming profiles table exists and has name/email)
-            // User said: profiles (user data), organization_members (links user to org)
-            // We need to fetch organization_members where org_id = activeOrgId
-            // And join with profiles on user_id
-
             try {
                 const { data: members, error } = await supabase
                     .from('organization_members')
                     .select(`
                         id,
+                        user_id,
                         role,
                         status,
                         created_at,
@@ -40,15 +36,19 @@ export default function MembersPage() {
 
                 if (error) throw error;
 
-                const formattedMembers: Member[] = members.map((m: any) => ({
-                    id: m.id,
-                    // Handle nested profile data safely
-                    name: m.profiles?.full_name || 'Unknown',
-                    email: m.profiles?.email || 'No Email',
-                    role: m.role, // "OWNER" | "ADMIN" | "MEMBER"
-                    status: m.status || 'ACTIVE', // Fallback if status not in DB or null
-                    lastActive: m.created_at // Using joined_at/created_at as proxy for now
-                }));
+                const formattedMembers: Member[] = members.map((m: any) => {
+                    const isCurrentUser = m.user_id === user?.id;
+                    const name = m.profiles?.full_name || 'Unknown';
+
+                    return {
+                        id: m.id,
+                        name: isCurrentUser ? `${name} (You)` : name,
+                        email: m.profiles?.email || 'No Email',
+                        role: m.role,
+                        status: m.status || 'ACTIVE',
+                        lastActive: m.created_at
+                    };
+                });
 
                 setData(formattedMembers);
             } catch (err) {

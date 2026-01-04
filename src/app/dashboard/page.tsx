@@ -1,86 +1,165 @@
 'use client';
 
 import { useAuthStore } from "@/store/use-auth-store";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, DollarSign, Activity, Plus, Building2, LogIn } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Bell, CreditCard, Building2, Plus, Calendar } from "lucide-react";
 import { CreateOrgForm } from "@/components/onboarding/create-org-form";
 import { JoinOrgForm } from "@/components/onboarding/join-org-form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatCurrency } from "@/lib/utils";
+import Link from "next/link";
+
+interface DueStatus {
+    id: string
+    title: string
+    amount: number
+    due_date: string
+    status: 'PAID' | 'OWED' | 'OVERDUE'
+    displayAmount: number
+}
+
+interface Notification {
+    id: string
+    title: string
+    message: string
+    created_at: string
+    is_read: boolean
+}
 
 export default function Page() {
     const { user, activeOrgId, organizations, setActiveOrg } = useAuthStore();
     const [isCreatingNew, setIsCreatingNew] = useState(false);
     const userName = user?.user_metadata?.full_name || user?.email || 'User';
 
-    // 1. Unified Onboarding/Creation View
-    // Shown if: User has NO organizations OR User explicitly clicked "Add New"
+    const [memberStats, setMemberStats] = useState({
+        totalOwed: 0,
+        nextDueDate: null as string | null,
+    });
+    const [upcomingDues, setUpcomingDues] = useState<DueStatus[]>([]);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        async function fetchData() {
+            if (!activeOrgId || !user) return;
+            setIsLoading(true);
+            const supabase = createClient();
+
+            try {
+                // 1. Fetch Dues & My Payments
+                const { data: duesData } = await supabase
+                    .from('dues')
+                    .select('*')
+                    .eq('organization_id', activeOrgId)
+                    .order('due_date', { ascending: true }); // Ascending to find nearest
+
+                const { data: payments } = await supabase
+                    .from('transactions')
+                    .select('amount, due_id')
+                    .eq('organization_id', activeOrgId)
+                    .eq('created_by', user.id);
+
+                // Process Dues
+                let owedSum = 0;
+                let nextDue = null as string | null;
+                const upcoming: DueStatus[] = [];
+
+                (duesData || []).forEach((d: any) => {
+                    const myPayment = payments?.find((p: any) => p.due_id === d.id);
+                    const isPaid = !!myPayment;
+                    const dueDate = new Date(d.due_date);
+                    const isOverdue = !isPaid && dueDate < new Date();
+                    let displayAmount = parseFloat(d.amount);
+
+                    if (isOverdue && d.penalty_type === 'DOUBLE') displayAmount *= 2;
+
+                    if (!isPaid) {
+                        owedSum += displayAmount;
+                        if (!nextDue || dueDate < new Date(nextDue)) nextDue = d.due_date;
+
+                        // Add to upcoming list (limit to 3 later)
+                        upcoming.push({
+                            id: d.id,
+                            title: d.title,
+                            amount: d.amount,
+                            due_date: d.due_date,
+                            status: isOverdue ? 'OVERDUE' : 'OWED',
+                            displayAmount
+                        });
+                    }
+                });
+
+                setMemberStats({
+                    totalOwed: owedSum,
+                    nextDueDate: nextDue
+                });
+                setUpcomingDues(upcoming.slice(0, 3)); // Top 3
+
+                // 2. Fetch Notifications
+                const { data: notifs } = await supabase
+                    .from('notifications')
+                    .select('*')
+                    .eq('organization_id', activeOrgId)
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+
+                setNotifications(notifs || []);
+
+            } catch (error) {
+                console.error("Error fetching member data:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+
+        fetchData();
+    }, [activeOrgId, user]);
+
+
+    // 1. Unified Onboarding/Creation View (Identical to before)
     if (organizations.length === 0 || isCreatingNew) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] p-4 space-y-8 relative">
-                {/* Back Button (Only if user actually has orgs to go back to) */}
                 {organizations.length > 0 && (
-                    <Button
-                        variant="ghost"
-                        className="absolute top-4 left-4"
-                        onClick={() => setIsCreatingNew(false)}
-                    >
+                    <Button variant="ghost" className="absolute top-4 left-4" onClick={() => setIsCreatingNew(false)}>
                         Back to Selection
                     </Button>
                 )}
-
                 <div className="text-center space-y-2">
-                    <h1 className="text-3xl font-bold">
-                        {organizations.length === 0 ? `Welcome to Ogbako, ${userName}!` : 'Expand Your Network'}
-                    </h1>
+                    <h1 className="text-3xl font-bold">{organizations.length === 0 ? `Welcome to Ogbako, ${userName}!` : 'Expand Your Network'}</h1>
                     <p className="text-muted-foreground text-lg max-w-lg">
-                        {organizations.length === 0
-                            ? "You don't belong to any organizations yet. Create or join one to get started."
-                            : "Create a new organization or join an existing one using an invite code."}
+                        {organizations.length === 0 ? "You don't belong to any organizations yet. Create or join one to get started." : "Create a new organization or join an existing one using an invite code."}
                     </p>
                 </div>
-
                 <div className="w-full max-w-md">
                     <Tabs defaultValue="create" className="w-full">
                         <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="create">Create New</TabsTrigger>
                             <TabsTrigger value="join">Join Existing</TabsTrigger>
                         </TabsList>
-                        <TabsContent value="create">
-                            <div className="mt-4">
-                                <CreateOrgForm />
-                            </div>
-                        </TabsContent>
-                        <TabsContent value="join">
-                            <div className="mt-4">
-                                <JoinOrgForm />
-                            </div>
-                        </TabsContent>
+                        <TabsContent value="create"><div className="mt-4"><CreateOrgForm /></div></TabsContent>
+                        <TabsContent value="join"><div className="mt-4"><JoinOrgForm /></div></TabsContent>
                     </Tabs>
                 </div>
             </div>
         );
     }
 
-    // 2. Selection State: User has organizations but NONE selected
+    // 2. Selection State (Identical to before)
     if (!activeOrgId) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] p-4 space-y-6 relative">
                 <div className="text-center space-y-2">
                     <h1 className="text-2xl font-bold">Select an Organization</h1>
-                    <p className="text-muted-foreground">
-                        Choose which organization you want to view.
-                    </p>
+                    <p className="text-muted-foreground">Choose which organization you want to view.</p>
                 </div>
-
                 <div className="grid gap-4 w-full max-w-2xl grid-cols-1 md:grid-cols-2">
                     {organizations.map((org) => (
-                        <Card
-                            key={org.id}
-                            className="cursor-pointer hover:border-primary transition-colors hover:shadow-md"
-                            onClick={() => setActiveOrg(org.id)}
-                        >
+                        <Card key={org.id} className="cursor-pointer hover:border-primary transition-colors hover:shadow-md" onClick={() => setActiveOrg(org.id)}>
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
                                 <CardTitle className="font-semibold text-lg">{org.name}</CardTitle>
                                 <Building2 className="h-5 w-5 text-muted-foreground" />
@@ -92,14 +171,8 @@ export default function Page() {
                         </Card>
                     ))}
                 </div>
-
-                {/* Floating Action Button for Adding New Org */}
                 <div className="fixed bottom-8 right-8">
-                    <Button
-                        size="icon"
-                        className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all"
-                        onClick={() => setIsCreatingNew(true)}
-                    >
+                    <Button size="icon" className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all" onClick={() => setIsCreatingNew(true)}>
                         <Plus className="h-8 w-8" />
                     </Button>
                 </div>
@@ -107,97 +180,118 @@ export default function Page() {
         );
     }
 
-    // 3. Active Dashboard State
+    // 3. New Member Dashboard
     return (
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+            <h1 className="text-2xl font-bold">Welcome back, {userName.split(' ')[0]}</h1>
+
+            {/* Summary Cards */}
             <div className="grid gap-4 md:grid-cols-3">
-                <Card>
+                <Card className={memberStats.totalOwed > 0 ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Welcome Back
-                        </CardTitle>
-                        <Activity className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-sm font-medium">Outstanding Dues</CardTitle>
+                        <CreditCard className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{userName}</div>
-                        <p className="text-xs text-muted-foreground">
-                            {user?.email}
-                        </p>
+                        <div className="text-2xl font-bold">{formatCurrency(memberStats.totalOwed)}</div>
+                        <p className="text-xs text-muted-foreground">{memberStats.totalOwed > 0 ? "Action required" : "All caught up"}</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Total Members
-                        </CardTitle>
-                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-sm font-medium">Next Payment</CardTitle>
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">128</div>
-                        <p className="text-xs text-muted-foreground">
-                            +4% from last month
-                        </p>
+                        <div className="text-2xl font-bold">
+                            {memberStats.nextDueDate ? new Date(memberStats.nextDueDate).toLocaleDateString() : "None"}
+                        </div>
+                        <p className="text-xs text-muted-foreground">Upcoming obligation</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Total Dues Collected
-                        </CardTitle>
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-sm font-medium">Notifications</CardTitle>
+                        <Bell className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">₦45,231.89</div>
-                        <p className="text-xs text-muted-foreground">
-                            +20.1% from last month
-                        </p>
+                        <div className="text-2xl font-bold">{notifications.filter(n => !n.is_read).length}</div>
+                        <p className="text-xs text-muted-foreground">Unread messages</p>
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Main Content Grid */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+
+                {/* Upcoming Dues */}
                 <Card className="col-span-4">
                     <CardHeader>
-                        <CardTitle>Overview</CardTitle>
+                        <CardTitle>Upcoming Dues</CardTitle>
+                        <CardDescription>Your pending financial obligations.</CardDescription>
                     </CardHeader>
-                    <CardContent className="pl-2">
-                        {/* Chart component placeholder */}
-                        <div className="h-[200px] w-full bg-muted/20 flex items-center justify-center rounded-md">
-                            Chart Integration Coming Soon
-                        </div>
+                    <CardContent className="space-y-4">
+                        {isLoading ? (
+                            <div className="text-muted-foreground text-sm">Loading...</div>
+                        ) : upcomingDues.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
+                                <CreditCard className="h-8 w-8 mb-2 opacity-20" />
+                                <p>No pending dues. You're all set!</p>
+                            </div>
+                        ) : (
+                            upcomingDues.map(due => (
+                                <div key={due.id} className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0">
+                                    <div>
+                                        <p className="font-medium">{due.title}</p>
+                                        <p className="text-sm text-muted-foreground">Due: {new Date(due.due_date).toLocaleDateString()}</p>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <div className="text-right">
+                                            <p className={`font-bold ${due.status === 'OVERDUE' ? 'text-red-600' : ''}`}>
+                                                {formatCurrency(due.displayAmount)}
+                                            </p>
+                                            {due.status === 'OVERDUE' && <Badge variant="destructive" className="text-[10px] h-5">Overdue</Badge>}
+                                        </div>
+                                        <Button size="sm" asChild>
+                                            <Link href="/dashboard/financials/dues">Pay</Link>
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </CardContent>
                 </Card>
+
+                {/* Notifications Widget */}
                 <Card className="col-span-3">
                     <CardHeader>
-                        <CardTitle>Recent Activity</CardTitle>
-                        <div className="text-sm text-muted-foreground">You have 2 new notifications</div>
+                        <CardTitle>Notifications</CardTitle>
+                        <CardDescription>Recent updates and broadcasts.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-8">
-                            <div className="flex items-center">
-                                <span className="relative flex h-9 w-9 shrink-0 overflow-hidden rounded-full mr-4">
-                                    <span className="flex h-full w-full items-center justify-center rounded-full bg-muted">OM</span>
-                                </span>
-                                <div className="ml-4 space-y-1">
-                                    <p className="text-sm font-medium leading-none">Olivia Martin</p>
-                                    <p className="text-sm text-muted-foreground">
-                                        Joined Ogbako Association
-                                    </p>
-                                </div>
-                                <div className="ml-auto font-medium">Just now</div>
+                        {isLoading ? (
+                            <div className="text-muted-foreground text-sm">Loading...</div>
+                        ) : notifications.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
+                                <Bell className="h-8 w-8 mb-2 opacity-20" />
+                                <p>No new notifications.</p>
                             </div>
-                            <div className="flex items-center">
-                                <span className="relative flex h-9 w-9 shrink-0 overflow-hidden rounded-full mr-4">
-                                    <span className="flex h-full w-full items-center justify-center rounded-full bg-muted">JL</span>
-                                </span>
-                                <div className="ml-4 space-y-1">
-                                    <p className="text-sm font-medium leading-none">Jackson Lee</p>
-                                    <p className="text-sm text-muted-foreground">
-                                        Paid Monthly Dues
-                                    </p>
-                                </div>
-                                <div className="ml-auto font-medium">2 min ago</div>
+                        ) : (
+                            <div className="space-y-4">
+                                {notifications.map(n => (
+                                    <div key={n.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/40">
+                                        <div className={`mt-1 h-2 w-2 rounded-full ${n.is_read ? 'bg-gray-300' : 'bg-blue-500'}`} />
+                                        <div className="space-y-1">
+                                            <p className="text-sm font-medium leading-none">{n.title}</p>
+                                            <p className="text-xs text-muted-foreground line-clamp-2">{n.message}</p>
+                                            <p className="text-[10px] text-muted-foreground opacity-70">
+                                                {new Date(n.created_at).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                        </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>
