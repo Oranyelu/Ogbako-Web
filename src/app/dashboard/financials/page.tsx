@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useAuthStore } from "@/store/use-auth-store"
-import { Loader2 } from "lucide-react"
+import { Loader2, Download, Shield, Eye, ArrowRight, ExternalLink } from "lucide-react"
+import Link from "next/link"
+import { Badge } from "@/components/ui/badge"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -36,7 +38,10 @@ interface Transaction {
 }
 
 export default function FinancialsPage() {
-    const { activeOrgId } = useAuthStore()
+    const { activeOrgId, getActiveOrgRole, transparencyMode } = useAuthStore()
+    const role = getActiveOrgRole()
+    const isAdmin = role === 'OWNER' || role === 'ADMIN'
+
     const [transactions, setTransactions] = useState<Transaction[]>([])
     const [isLoading, setIsLoading] = useState(true)
 
@@ -45,7 +50,7 @@ export default function FinancialsPage() {
         .filter(t => t.type === 'INCOME')
         .reduce((sum, t) => sum + Number(t.amount), 0);
 
-    const duesCollected = totalRevenue; // Simplified for now (assuming all income is dues)
+    const duesCollected = totalRevenue;
 
     useEffect(() => {
         async function fetchFinancials() {
@@ -78,21 +83,117 @@ export default function FinancialsPage() {
         fetchFinancials();
     }, [activeOrgId]);
 
+    const handleDownloadReport = () => {
+        if (transactions.length === 0) {
+            alert("No transaction records available to export yet.");
+            return;
+        }
+
+        const headers = ["Transaction ID", "Date", "Description", "Type", "Amount (NGN)", "Recorded By"];
+        const rows = transactions.map(t => [
+            t.id,
+            new Date(t.date).toLocaleDateString(),
+            `"${t.description.replace(/"/g, '""')}"`,
+            t.type,
+            t.amount,
+            `"${t.profiles?.full_name || ''}"`
+        ]);
+
+        const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `ogbako-financial-report-${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     if (isLoading) {
         return <div className="flex items-center justify-center p-10"><Loader2 className="h-8 w-8 animate-spin" /></div>
     }
 
+    // TRANSPARENCY MODE RESTRICTION:
+    // If user is a regular member and Transparency Mode is OFF, don't reveal full org treasury
+    if (!isAdmin && !transparencyMode) {
+        return (
+            <div className="flex-1 space-y-6 p-8 pt-6 max-w-4xl">
+                <div>
+                    <h2 className="text-3xl font-bold tracking-tight">Financials</h2>
+                    <p className="text-muted-foreground text-sm mt-1">Community financial records & commitments.</p>
+                </div>
+
+                <Card className="border-2 border-amber-200 bg-amber-50/50 shadow-sm">
+                    <CardHeader>
+                        <div className="flex items-center gap-3">
+                            <div className="p-3 bg-amber-100 text-amber-800 rounded-xl">
+                                <Shield className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-xl flex items-center gap-2 text-amber-950">
+                                    Transparency Mode is Disabled
+                                    <Badge variant="outline" className="text-amber-800 bg-amber-100 border-amber-300">
+                                        Private Mode
+                                    </Badge>
+                                </CardTitle>
+                                <CardDescription className="text-amber-800/80">
+                                    Overall treasury balances and organization-wide transactions are currently restricted by your administrators.
+                                </CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <p className="text-sm text-amber-900 leading-relaxed">
+                            Under the current privacy settings, members can only view their own personal dues, payment history, and individual financial obligations.
+                        </p>
+                        <div className="flex flex-wrap gap-4 pt-2">
+                            <Link href="/dashboard/financials/dues">
+                                <Button className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2">
+                                    View My Dues Obligations
+                                    <ArrowRight className="h-4 w-4" />
+                                </Button>
+                            </Link>
+                            <Link href="/dashboard/financials/transactions">
+                                <Button variant="outline" className="border-amber-300 hover:bg-amber-100/50 text-amber-900">
+                                    View My Payment Receipts
+                                </Button>
+                            </Link>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
     return (
         <div className="flex-1 space-y-4 p-8 pt-6">
-            <div className="flex items-center justify-between space-y-2">
-                <h2 className="text-3xl font-bold tracking-tight">Financials</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <div className="flex items-center gap-2">
+                        <h2 className="text-3xl font-bold tracking-tight">Financials</h2>
+                        {transparencyMode && (
+                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200 text-xs">
+                                <Eye className="h-3 w-3 mr-1 text-green-600" />
+                                Transparency Mode ON
+                            </Badge>
+                        )}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                        Overview of organizational revenue, dues collection, and meeting transactions.
+                    </p>
+                </div>
                 <div className="flex items-center space-x-2">
-                    <Button>Download Report</Button>
+                    <Button onClick={handleDownloadReport} className="gap-2">
+                        <Download className="h-4 w-4" />
+                        Download Report
+                    </Button>
                 </div>
             </div>
             <Tabs defaultValue="overview" className="space-y-4">
                 <TabsList>
                     <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="transactions">Recent Activity</TabsTrigger>
+                </TabsList>
                     <TabsTrigger value="transactions">Transactions</TabsTrigger>
                     <TabsTrigger value="reports" disabled>
                         Reports
