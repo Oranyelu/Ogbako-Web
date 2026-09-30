@@ -29,7 +29,7 @@ import {
 import { useAuthStore } from '@/store/use-auth-store';
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-    const { getActiveOrgRole, user: authUser, activeOrgId } = useAuthStore();
+    const { getActiveOrgRole, user: authUser, activeOrgId, transparencyMode } = useAuthStore();
     const [mounted, setMounted] = React.useState(false);
 
     React.useEffect(() => {
@@ -37,13 +37,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }, []);
 
     // Only render sidebar content if mounted and there is an active organization
-    // This effectively hides the sidebar during onboarding/selection
     const shouldShowSidebar = mounted && !!activeOrgId;
-
     const role = shouldShowSidebar ? getActiveOrgRole() : null;
+    const isAdminOrOwner = role === 'OWNER' || role === 'ADMIN';
 
-    // Define Navigation Items (Standardized)
-    // Define Navigation Items (Standardized)
+    // Define Navigation Items
     const navItems = [
         {
             title: 'Dashboard',
@@ -61,27 +59,37 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             icon: Bot,
             items: [
                 { title: 'All Members', url: '/dashboard/members' },
-                { title: 'Roles', url: '/dashboard/members/roles', requiredRole: ['OWNER', 'ADMIN'] },
+                { title: 'Roles & Permissions', url: '/dashboard/members/roles', requiredRole: ['OWNER', 'ADMIN'] },
             ],
         },
         {
             title: 'Financials',
             url: '/dashboard/financials',
             icon: BookOpen,
-            requiredRole: ['OWNER', 'ADMIN'],
-            items: [
+            items: isAdminOrOwner || transparencyMode ? [
+                { title: 'Overview', url: '/dashboard/financials' },
                 { title: 'Transactions', url: '/dashboard/financials/transactions' },
-                { title: 'Dues', url: '/dashboard/financials/dues' },
+                { title: 'Dues & Obligations', url: '/dashboard/financials/dues' },
+            ] : [
+                { title: 'My Dues', url: '/dashboard/financials/dues' },
+                { title: 'My Payments', url: '/dashboard/financials/transactions' },
+            ],
+        },
+        {
+            title: 'Meetings & Minutes',
+            url: '/dashboard/content',
+            icon: Frame,
+            items: [
+                { title: 'Content Studio', url: '/dashboard/content' },
             ],
         },
         {
             title: 'Settings',
             url: '/dashboard/settings',
             icon: Settings2,
-            requiredRole: ['OWNER', 'ADMIN'],
             items: [
-                { title: 'General', url: '/dashboard/settings' },
-                { title: 'Billing', url: '/dashboard/settings/billing' },
+                { title: 'Organization', url: '/dashboard/settings' },
+                { title: 'Billing & Plans', url: '/dashboard/settings/billing' },
             ],
         },
         {

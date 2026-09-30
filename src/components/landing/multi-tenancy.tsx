@@ -61,8 +61,8 @@ export function LandingMultiTenancy() {
                             One user, endless communities. Create, join, and switch between multiple organizations seamlessly from one secure dashboard. No more multiple logins.
                         </p>
 
-                        <Link href="#onboarding" className="inline-flex items-center text-white font-bold hover:underline underline-offset-4 group">
-                            Learn about Onboarding
+                        <Link href="/register" className="inline-flex items-center text-white font-bold hover:underline underline-offset-4 group">
+                            Start Your Organization
                             <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                         </Link>
                     </div>

@@ -12,7 +12,7 @@ const benefits = [
 
 export function LandingBenefits() {
     return (
-        <section id="features" className="py-24 bg-background">
+        <section id="how-it-works" className="py-24 bg-background">
             <div className="container px-4 md:px-6 mx-auto max-w-7xl">
                 <div className="grid lg:grid-cols-2 gap-16 items-center">
                     <div className="space-y-8">
@@ -25,12 +25,16 @@ export function LandingBenefits() {
                         </p>
 
                         <div className="flex flex-wrap gap-4">
-                            <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
-                                View Documentation
-                            </Button>
-                            <Button size="lg" variant="outline" className="border-primary/20 text-primary hover:bg-primary/5">
-                                Contact Sales
-                            </Button>
+                            <Link href="#pricing">
+                                <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
+                                    See Plans & Pricing
+                                </Button>
+                            </Link>
+                            <Link href="/register">
+                                <Button size="lg" variant="outline" className="border-primary/20 text-primary hover:bg-primary/5">
+                                    Start Free Trial
+                                </Button>
+                            </Link>
                         </div>
                     </div>
 

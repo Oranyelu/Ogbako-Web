@@ -7,16 +7,18 @@ import { useAuthStore } from '@/store/use-auth-store';
 
 export function AuthListener() {
     const router = useRouter();
-    const { setUser, setOrganizations, activeOrgId } = useAuthStore();
+    const { setUser, setOrganizations, organizations, loadUserOrganizations } = useAuthStore();
 
     useEffect(() => {
         const supabase = createClient();
 
         // 1. Initial Session Check
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        supabase.auth.getSession().then(async ({ data: { session } }) => {
             if (session?.user) {
-                // Update store with fresh user data (metadata, email, etc.)
                 setUser(session.user);
+                if (organizations.length === 0) {
+                    await loadUserOrganizations(supabase, session.user);
+                }
             }
         });
 
@@ -25,10 +27,8 @@ export function AuthListener() {
             data: { subscription },
         } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (session?.user) {
-                // Update user in store whenever session refreshes/signs in
                 setUser(session.user);
-
-                // Optional: You could fetch organizations here if needed
+                await loadUserOrganizations(supabase, session.user);
             } else if (event === 'SIGNED_OUT') {
                 setUser(null);
                 setOrganizations([]);
@@ -39,7 +39,7 @@ export function AuthListener() {
         return () => {
             subscription.unsubscribe();
         };
-    }, [setUser, setOrganizations, router]);
+    }, [setUser, setOrganizations, loadUserOrganizations, organizations.length, router]);
 
     return null; // This component renders nothing
 }

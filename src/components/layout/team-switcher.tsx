@@ -1,7 +1,7 @@
 "use client"
-
 import * as React from "react"
 import { ChevronsUpDown, GalleryVerticalEnd, Plus, Building2 } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 import {
     DropdownMenu,
@@ -22,6 +22,7 @@ import { useAuthStore } from "@/store/use-auth-store"
 
 export function TeamSwitcher() {
     const { isMobile } = useSidebar()
+    const router = useRouter()
     const { organizations, activeOrgId, setActiveOrg } = useAuthStore()
     const [mounted, setMounted] = React.useState(false)
 
@@ -99,11 +100,11 @@ export function TeamSwitcher() {
                             </DropdownMenuItem>
                         ))}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="gap-2 p-2" onClick={() => setActiveOrg('')}>
+                        <DropdownMenuItem className="gap-2 p-2 cursor-pointer" onClick={() => router.push('/create-org')}>
                             <div className="flex size-6 items-center justify-center rounded-md border bg-background">
                                 <Plus className="size-4" />
                             </div>
-                            <div className="font-medium text-muted-foreground">Add Organization</div>
+                            <div className="font-medium text-foreground">Add Organization</div>
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>

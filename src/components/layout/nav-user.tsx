@@ -96,17 +96,17 @@ export function NavUser({
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuGroup>
-                            <DropdownMenuItem>
-                                <BadgeCheck />
-                                Account
+                            <DropdownMenuItem className="cursor-pointer" onClick={() => router.push('/dashboard/settings')}>
+                                <BadgeCheck className="mr-2 h-4 w-4" />
+                                Account Settings
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                <CreditCard />
-                                Billing
+                            <DropdownMenuItem className="cursor-pointer" onClick={() => router.push('/dashboard/settings/billing')}>
+                                <CreditCard className="mr-2 h-4 w-4" />
+                                Billing & Plans
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                <Bell />
-                                Notifications
+                            <DropdownMenuItem className="cursor-pointer" onClick={() => router.push('/dashboard/admin/notifications')}>
+                                <Bell className="mr-2 h-4 w-4" />
+                                Broadcasts
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />

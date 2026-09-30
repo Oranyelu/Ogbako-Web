@@ -26,7 +26,7 @@ const features = [
 
 export function LandingPillars() {
     return (
-        <section className="py-24 bg-background relative z-10">
+        <section id="features" className="py-24 bg-background relative z-10">
             <div className="container px-4 md:px-6 mx-auto max-w-7xl">
                 <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
                     <h2 className="text-3xl font-bold tracking-tight text-primary sm:text-4xl">

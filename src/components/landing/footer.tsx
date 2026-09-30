@@ -35,29 +35,29 @@ export function LandingFooter() {
                     <div className="space-y-4">
                         <h4 className="font-bold text-lg">Product</h4>
                         <ul className="space-y-2 text-gray-400">
-                            <li><Link href="#" className="hover:text-secondary transition-colors">Features</Link></li>
-                            <li><Link href="#" className="hover:text-secondary transition-colors">Pricing</Link></li>
-                            <li><Link href="#" className="hover:text-secondary transition-colors">Security</Link></li>
-                            <li><Link href="#" className="hover:text-secondary transition-colors">Changelog</Link></li>
+                            <li><Link href="#features" className="hover:text-secondary transition-colors">Features</Link></li>
+                            <li><Link href="#pricing" className="hover:text-secondary transition-colors">Pricing</Link></li>
+                            <li><Link href="#solutions" className="hover:text-secondary transition-colors">Multi-Tenancy</Link></li>
+                            <li><Link href="/dashboard" className="hover:text-secondary transition-colors">Member Dashboard</Link></li>
                         </ul>
                     </div>
 
                     <div className="space-y-4">
                         <h4 className="font-bold text-lg">Company</h4>
                         <ul className="space-y-2 text-gray-400">
-                            <li><Link href="#" className="hover:text-secondary transition-colors">About Us</Link></li>
-                            <li><Link href="#" className="hover:text-secondary transition-colors">Careers</Link></li>
-                            <li><Link href="#" className="hover:text-secondary transition-colors">Blog</Link></li>
-                            <li><Link href="#" className="hover:text-secondary transition-colors">Contact</Link></li>
+                            <li><Link href="#features" className="hover:text-secondary transition-colors">About Ogbako</Link></li>
+                            <li><Link href="#how-it-works" className="hover:text-secondary transition-colors">How It Works</Link></li>
+                            <li><Link href="/register" className="hover:text-secondary transition-colors">Start Community</Link></li>
+                            <li><Link href="mailto:support@ogbako.com" className="hover:text-secondary transition-colors">Contact Support</Link></li>
                         </ul>
                     </div>
 
                     <div className="space-y-4">
                         <h4 className="font-bold text-lg">Legal</h4>
                         <ul className="space-y-2 text-gray-400">
-                            <li><Link href="#" className="hover:text-secondary transition-colors">Privacy Policy</Link></li>
-                            <li><Link href="#" className="hover:text-secondary transition-colors">Terms of Service</Link></li>
-                            <li><Link href="#" className="hover:text-secondary transition-colors">Cookie Policy</Link></li>
+                            <li><Link href="#pricing" className="hover:text-secondary transition-colors">Pricing Terms</Link></li>
+                            <li><Link href="/login" className="hover:text-secondary transition-colors">Account Security</Link></li>
+                            <li><Link href="#solutions" className="hover:text-secondary transition-colors">Tenant Isolation</Link></li>
                         </ul>
                     </div>
                 </div>

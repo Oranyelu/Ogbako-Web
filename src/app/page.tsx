@@ -3,6 +3,7 @@ import { LandingHero } from "@/components/landing/hero"
 import { LandingPillars } from "@/components/landing/pillars"
 import { LandingMultiTenancy } from "@/components/landing/multi-tenancy"
 import { LandingBenefits } from "@/components/landing/benefits"
+import { LandingPricing } from "@/components/landing/pricing"
 import { LandingTestimonial } from "@/components/landing/testimonial"
 import { LandingCTA } from "@/components/landing/cta"
 import { LandingFooter } from "@/components/landing/footer"
@@ -15,6 +16,7 @@ export default function LandingPage() {
         <LandingHero />
         <LandingPillars />
         <LandingMultiTenancy />
+        <LandingPricing />
         <LandingBenefits />
         <LandingTestimonial />
         <LandingCTA />

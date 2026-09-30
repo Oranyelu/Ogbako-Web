@@ -35,6 +35,7 @@ const formSchema = z.object({
     email: z.string().email({
         message: 'Please enter a valid email address.',
     }),
+    organizationName: z.string().optional(),
     password: z.string().min(8, {
         message: 'Password must be at least 8 characters.',
     }),
@@ -48,7 +49,7 @@ const formSchema = z.object({
 
 export function RegisterForm() {
     const router = useRouter();
-    const { setUser } = useAuthStore();
+    const { setUser, setOrganizations, setActiveOrg, organizations } = useAuthStore();
     const [isLoading, setIsLoading] = useState(false);
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -56,6 +57,7 @@ export function RegisterForm() {
         defaultValues: {
             name: '',
             email: '',
+            organizationName: '',
             password: '',
             confirmPassword: '',
         },
@@ -90,6 +92,46 @@ export function RegisterForm() {
 
             if (data.user && data.session) {
                 setUser(data.user);
+
+                // Multi-tenancy: if organization name was supplied, create organization now
+                if (values.organizationName && values.organizationName.trim().length >= 2) {
+                    const orgName = values.organizationName.trim();
+                    const slug = orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') + '-' + Math.random().toString(36).substring(2, 6);
+                    const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+                    try {
+                        const { data: orgData, error: orgError } = await supabase
+                            .from('organizations')
+                            .insert({
+                                name: orgName,
+                                slug,
+                                created_by: data.user.id,
+                                join_code: joinCode
+                            })
+                            .select()
+                            .single();
+
+                        if (!orgError && orgData) {
+                            const newOrg = {
+                                id: orgData.id,
+                                name: orgData.name,
+                                slug: orgData.slug,
+                                role: 'OWNER' as const,
+                                tier: 'BASIC' as const,
+                                transparencyMode: false
+                            };
+                            setOrganizations([...organizations, newOrg]);
+                            setActiveOrg(newOrg.id);
+                            router.push('/dashboard');
+                            router.refresh();
+                            return;
+                        }
+                    } catch (orgErr) {
+                        console.warn("Could not auto-create organization on register, continuing to create-org:", orgErr);
+                    }
+                }
+
+                // Default: Route to onboarding to choose/create organization
                 router.push('/create-org');
                 router.refresh();
             }
@@ -134,6 +176,19 @@ export function RegisterForm() {
                                     <FormLabel>Email</FormLabel>
                                     <FormControl>
                                         <Input placeholder="m@example.com" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="organizationName"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Organization / Community (Optional)</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="e.g. Umuahia Youth Association" {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>

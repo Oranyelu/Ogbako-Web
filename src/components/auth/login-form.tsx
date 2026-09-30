@@ -39,7 +39,7 @@ const formSchema = z.object({
 
 export function LoginForm() {
     const router = useRouter();
-    const { setUser } = useAuthStore();
+    const { setUser, setOrganizations, setActiveOrg } = useAuthStore();
     const [isLoading, setIsLoading] = useState(false);
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -58,7 +58,7 @@ export function LoginForm() {
             const { data, error } = await supabase.auth.signInWithPassword({
                 email: values.email,
                 password: values.password,
-            })
+            });
 
             if (error) {
                 console.error("Login failed:", error.message);
@@ -67,12 +67,52 @@ export function LoginForm() {
 
             if (data.user) {
                 setUser(data.user);
-                router.push('/dashboard');
-                router.refresh(); // Refresh to update middleware/server state
+
+                // Multi-tenancy: Fetch user's organizations and set active context
+                try {
+                    const { data: memberships } = await supabase
+                        .from('organization_members')
+                        .select(`
+                            role,
+                            organization_id,
+                            organizations (
+                                id,
+                                name,
+                                slug
+                            )
+                        `)
+                        .eq('user_id', data.user.id);
+
+                    const userOrgs = (memberships || [])
+                        .filter((m: any) => m.organizations)
+                        .map((m: any) => ({
+                            id: m.organizations.id,
+                            name: m.organizations.name,
+                            slug: m.organizations.slug,
+                            role: m.role || 'MEMBER',
+                            tier: 'BASIC' as const,
+                            transparencyMode: false
+                        }));
+
+                    if (userOrgs.length > 0) {
+                        setOrganizations(userOrgs);
+                        const savedOrgId = typeof window !== 'undefined' ? localStorage.getItem('x-org-id') : null;
+                        const targetOrgId = userOrgs.some((o: any) => o.id === savedOrgId) ? savedOrgId! : userOrgs[0].id;
+                        setActiveOrg(targetOrgId);
+                        router.push('/dashboard');
+                    } else {
+                        // User has no organization yet: route to onboarding
+                        router.push('/create-org');
+                    }
+                } catch (orgErr) {
+                    console.warn("Could not fetch user organizations:", orgErr);
+                    router.push('/dashboard');
+                }
+
+                router.refresh();
             }
         } catch (error: any) {
             console.error("Login failed:", error);
-            // In a real app, use a Toast here to show error message
             alert(error.message || "Login failed. Please check your credentials.");
         } finally {
             setIsLoading(false);
