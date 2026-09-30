@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, CreditCard, Building2, Plus, Calendar } from "lucide-react";
+import { Bell, CreditCard, Building2, Plus, Calendar, Users, FileText, Receipt, Shield, Eye, Settings, ArrowRight } from "lucide-react";
 import { CreateOrgForm } from "@/components/onboarding/create-org-form";
 import { JoinOrgForm } from "@/components/onboarding/join-org-form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,7 +31,9 @@ interface Notification {
 }
 
 export default function Page() {
-    const { user, activeOrgId, organizations, setActiveOrg } = useAuthStore();
+    const { user, activeOrgId, organizations, setActiveOrg, getActiveOrgRole, transparencyMode } = useAuthStore();
+    const role = getActiveOrgRole();
+    const isAdmin = role === 'OWNER' || role === 'ADMIN';
     const [isCreatingNew, setIsCreatingNew] = useState(false);
     const userName = user?.user_metadata?.full_name || user?.email || 'User';
 
@@ -182,12 +184,86 @@ export default function Page() {
 
     // 3. New Member Dashboard
     return (
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-            <h1 className="text-2xl font-bold">Welcome back, {userName.split(' ')[0]}</h1>
+        <div className="flex flex-1 flex-col gap-5 p-4 pt-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                    <h1 className="text-2xl font-bold tracking-tight">Welcome back, {userName.split(' ')[0]}</h1>
+                    <p className="text-sm text-muted-foreground">Your community meeting portal and financial workspace.</p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant={transparencyMode ? "default" : "secondary"} className="flex items-center gap-1.5 py-1 px-3 text-xs">
+                        <Eye className="h-3.5 w-3.5" />
+                        <span>Transparency Mode: {transparencyMode ? "ON" : "OFF"}</span>
+                    </Badge>
+                    {isAdmin && (
+                        <Badge variant="outline" className="text-xs border-primary/40 bg-primary/5 text-primary">
+                            <Shield className="h-3 w-3 mr-1 text-primary" /> Admin Mode
+                        </Badge>
+                    )}
+                </div>
+            </div>
+
+            {/* Quick Actions Bar */}
+            <Card className="bg-muted/30 border shadow-sm">
+                <CardHeader className="py-3 px-4">
+                    <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                        <Button variant="outline" size="sm" asChild className="h-auto py-2.5 flex flex-col items-center justify-center gap-1 text-xs hover:border-primary hover:bg-primary/5">
+                            <Link href="/dashboard/financials/dues">
+                                <CreditCard className="h-4 w-4 text-emerald-600" />
+                                <span>Pay Dues</span>
+                            </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild className="h-auto py-2.5 flex flex-col items-center justify-center gap-1 text-xs hover:border-primary hover:bg-primary/5">
+                            <Link href="/dashboard/content">
+                                <FileText className="h-4 w-4 text-blue-600" />
+                                <span>Minutes</span>
+                            </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild className="h-auto py-2.5 flex flex-col items-center justify-center gap-1 text-xs hover:border-primary hover:bg-primary/5">
+                            <Link href="/dashboard/members">
+                                <Users className="h-4 w-4 text-violet-600" />
+                                <span>Members</span>
+                            </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild className="h-auto py-2.5 flex flex-col items-center justify-center gap-1 text-xs hover:border-primary hover:bg-primary/5">
+                            <Link href="/dashboard/financials/transactions">
+                                <Receipt className="h-4 w-4 text-amber-600" />
+                                <span>Ledger</span>
+                            </Link>
+                        </Button>
+                        {isAdmin ? (
+                            <>
+                                <Button variant="outline" size="sm" asChild className="h-auto py-2.5 flex flex-col items-center justify-center gap-1 text-xs hover:border-primary hover:bg-primary/5">
+                                    <Link href="/dashboard/admin/dues">
+                                        <Shield className="h-4 w-4 text-indigo-600" />
+                                        <span>Manage Dues</span>
+                                    </Link>
+                                </Button>
+                                <Button variant="outline" size="sm" asChild className="h-auto py-2.5 flex flex-col items-center justify-center gap-1 text-xs hover:border-primary hover:bg-primary/5">
+                                    <Link href="/dashboard/settings">
+                                        <Settings className="h-4 w-4 text-slate-600" />
+                                        <span>Settings</span>
+                                    </Link>
+                                </Button>
+                            </>
+                        ) : (
+                            <Button variant="outline" size="sm" asChild className="h-auto py-2.5 flex flex-col items-center justify-center gap-1 text-xs hover:border-primary hover:bg-primary/5">
+                                <Link href="/dashboard/financials">
+                                    <Eye className="h-4 w-4 text-cyan-600" />
+                                    <span>Financials</span>
+                                </Link>
+                            </Button>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Summary Cards */}
             <div className="grid gap-4 md:grid-cols-3">
-                <Card className={memberStats.totalOwed > 0 ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}>
+                <Card className={memberStats.totalOwed > 0 ? "border-red-200 bg-red-50/60" : "border-green-200 bg-green-50/60"}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Outstanding Dues</CardTitle>
                         <CreditCard className="h-4 w-4 text-muted-foreground" />

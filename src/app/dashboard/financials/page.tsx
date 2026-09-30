@@ -194,14 +194,6 @@ export default function FinancialsPage() {
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="transactions">Recent Activity</TabsTrigger>
                 </TabsList>
-                    <TabsTrigger value="transactions">Transactions</TabsTrigger>
-                    <TabsTrigger value="reports" disabled>
-                        Reports
-                    </TabsTrigger>
-                    <TabsTrigger value="notifications" disabled>
-                        Notifications
-                    </TabsTrigger>
-                </TabsList>
                 <TabsContent value="overview" className="space-y-4">
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                         <Card>
@@ -331,9 +323,17 @@ export default function FinancialsPage() {
                 </TabsContent>
                 <TabsContent value="transactions" className="space-y-4">
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Transaction History</CardTitle>
-                            <CardDescription>View all transactions.</CardDescription>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <div>
+                                <CardTitle>Transaction History</CardTitle>
+                                <CardDescription>Recent transaction activity.</CardDescription>
+                            </div>
+                            <Link href="/dashboard/financials/transactions">
+                                <Button variant="outline" size="sm" className="gap-1">
+                                    Open Full Ledger
+                                    <ArrowRight className="h-3.5 w-3.5" />
+                                </Button>
+                            </Link>
                         </CardHeader>
                         <CardContent>
                             {transactions.length === 0 ? (

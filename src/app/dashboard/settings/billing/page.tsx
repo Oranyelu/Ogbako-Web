@@ -66,6 +66,7 @@ const PLANS: PlanInfo[] = [
         period: "/month",
         memberLimit: "200 members",
         maxMembers: 200,
+        description: "Advanced community management with in-app payments, offline meeting mode, and minute notifications.",
         highlight: true,
         badge: "Most Popular",
         features: [
@@ -86,6 +87,7 @@ const PLANS: PlanInfo[] = [
         period: "/month",
         memberLimit: "Unlimited members",
         maxMembers: 999999,
+        description: "Full-scale solution featuring online meetings, AI minutes taking and summarization, and unlimited membership.",
         badge: "Enterprise & Diaspora",
         features: [
             "Unlimited members",
