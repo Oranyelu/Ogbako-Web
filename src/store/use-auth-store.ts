@@ -435,7 +435,16 @@ export const useAuthStore = create<AuthState>()(
                             organizations (
                                 id,
                                 name,
-                                slug
+                                slug,
+                                category,
+                                description,
+                                meeting_frequency,
+                                currency,
+                                join_code,
+                                tier,
+                                transparency_mode,
+                                is_verified_identity,
+                                rules
                             )
                         `)
                         .eq('user_id', user.id);
@@ -446,19 +455,39 @@ export const useAuthStore = create<AuthState>()(
 
                     const loadedOrgs: Organization[] = memberRows
                         .filter((row: any) => row.organizations)
-                        .map((row: any) => ({
-                            id: row.organizations.id,
-                            name: row.organizations.name,
-                            slug: row.organizations.slug,
-                            role: row.role as 'OWNER' | 'ADMIN' | 'MEMBER',
-                            tier: 'BASIC',
-                            transparencyMode: false
-                        }));
+                        .map((row: any) => {
+                            const o = row.organizations;
+                            return {
+                                id: o.id,
+                                name: o.name,
+                                slug: o.slug,
+                                role: row.role as 'OWNER' | 'ADMIN' | 'MEMBER',
+                                tier: o.tier || 'BASIC',
+                                transparencyMode: o.transparency_mode ?? false,
+                                category: o.category || 'Town Union',
+                                description: o.description || '',
+                                meetingFrequency: o.meeting_frequency || 'Monthly',
+                                currency: o.currency || 'NGN',
+                                joinCode: o.join_code,
+                                isVerifiedIdentity: o.is_verified_identity ?? false,
+                                rules: o.rules,
+                                memberCount: 1,
+                            };
+                        });
 
                     if (loadedOrgs.length > 0) {
-                        get().setOrganizations(loadedOrgs);
+                        // Merge with existing local orgs to avoid losing any local test data
+                        const existing = get().organizations;
+                        const merged = [...loadedOrgs];
+                        for (const ex of existing) {
+                            if (!merged.some(m => m.id === ex.id)) {
+                                merged.push(ex);
+                            }
+                        }
+                        get().setOrganizations(merged);
+                        return merged;
                     }
-                    return loadedOrgs;
+                    return get().organizations;
                 } catch (e) {
                     console.warn("Could not load user organizations from Supabase:", e);
                     return get().organizations;

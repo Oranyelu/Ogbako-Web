@@ -13,6 +13,7 @@ import { PersonalHub } from "@/components/dashboard/personal-hub";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface DueStatus {
     id: string
@@ -32,6 +33,7 @@ interface Notification {
 }
 
 export default function Page() {
+    const router = useRouter();
     const { user, activeOrgId, organizations, setActiveOrg, getActiveOrgRole, transparencyMode } = useAuthStore();
     const role = getActiveOrgRole();
     const isAdmin = role === 'OWNER' || role === 'ADMIN';
@@ -142,44 +144,103 @@ export default function Page() {
         );
     }
 
-    // 2. Selection State (Identical to before)
+    // 2. Selection State
     if (!activeOrgId) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] p-4 space-y-6 relative">
                 <div className="text-center space-y-2">
-                    <h1 className="text-2xl font-bold">Select an Organization</h1>
-                    <p className="text-muted-foreground">Choose which organization you want to view.</p>
+                    <h1 className="text-3xl font-bold tracking-tight">Select an Organization</h1>
+                    <p className="text-muted-foreground text-sm max-w-md">
+                        You belong to multiple community platforms. Choose which workspace you want to open.
+                    </p>
                 </div>
-                <div className="grid gap-4 w-full max-w-2xl grid-cols-1 md:grid-cols-2">
+                <div className="grid gap-4 w-full max-w-3xl grid-cols-1 md:grid-cols-2">
                     {organizations.map((org) => (
-                        <Card key={org.id} className="cursor-pointer hover:border-primary transition-colors hover:shadow-md" onClick={() => setActiveOrg(org.id)}>
-                            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="font-semibold text-lg">{org.name}</CardTitle>
-                                <Building2 className="h-5 w-5 text-muted-foreground" />
+                        <Card key={org.id} className="cursor-pointer hover:border-primary transition-all hover:shadow-md border-border/80 flex flex-col justify-between" onClick={() => setActiveOrg(org.id)}>
+                            <CardHeader className="flex flex-row items-start justify-between pb-2">
+                                <div className="space-y-1">
+                                    <CardTitle className="font-semibold text-lg">{org.name}</CardTitle>
+                                    <span className="text-xs text-muted-foreground capitalize">{org.category || 'Community Group'}</span>
+                                </div>
+                                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                                    <Building2 className="h-5 w-5" />
+                                </div>
                             </CardHeader>
-                            <CardContent>
-                                <p className="text-sm text-muted-foreground mb-4">Role: {org.role}</p>
-                                <Button variant="secondary" className="w-full">Open Dashboard</Button>
+                            <CardContent className="pt-2">
+                                <div className="flex items-center justify-between text-xs text-muted-foreground mb-4">
+                                    <span>Role: <strong className="capitalize text-foreground">{org.role.toLowerCase()}</strong></span>
+                                    {org.joinCode && <span>Code: <code className="font-mono font-bold text-foreground">{org.joinCode}</code></span>}
+                                </div>
+                                <Button variant="secondary" className="w-full font-medium">Open Workspace →</Button>
                             </CardContent>
                         </Card>
                     ))}
-                </div>
-                <div className="fixed bottom-8 right-8">
-                    <Button size="icon" className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all" onClick={() => setIsCreatingNew(true)}>
-                        <Plus className="h-8 w-8" />
-                    </Button>
+
+                    {/* Card to create another new group */}
+                    <Card className="border-dashed border-2 hover:border-primary transition-all hover:shadow-md flex flex-col items-center justify-center p-6 text-center bg-muted/10 cursor-pointer" onClick={() => router.push('/create-org')}>
+                        <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-3">
+                            <Plus className="h-6 w-6" />
+                        </div>
+                        <h3 className="font-semibold text-base">Create New Group</h3>
+                        <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">
+                            Establish a new town union, age grade, or clan assembly.
+                        </p>
+                    </Card>
                 </div>
             </div>
         );
     }
 
+    const currentOrg = organizations.find(o => o.id === activeOrgId);
+
     // 3. New Member Dashboard
     return (
         <div className="flex flex-1 flex-col gap-5 p-4 pt-0">
+            {/* Multi-Platform Switcher Banner if member of multiple organizations */}
+            {organizations.length > 1 && (
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-primary shrink-0" />
+                        <span className="text-xs text-muted-foreground">
+                            Multi-Platform Active: <strong className="text-foreground">{currentOrg?.name}</strong> ({organizations.length} groups)
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        {organizations.map((org) => {
+                            const isCurrent = org.id === activeOrgId;
+                            return (
+                                <Button
+                                    key={org.id}
+                                    variant={isCurrent ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setActiveOrg(org.id)}
+                                    className={`h-7 px-2.5 text-xs ${isCurrent ? 'bg-primary text-primary-foreground font-semibold' : 'bg-background hover:bg-muted'}`}
+                                >
+                                    <span className="max-w-[130px] truncate">{org.name}</span>
+                                </Button>
+                            );
+                        })}
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            className="h-7 px-2 text-xs text-primary hover:bg-primary/10 gap-1"
+                        >
+                            <Link href="/create-org">
+                                <Plus className="h-3 w-3" />
+                                <span>New</span>
+                            </Link>
+                        </Button>
+                    </div>
+                </div>
+            )}
+
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">Welcome back, {userName.split(' ')[0]}</h1>
-                    <p className="text-sm text-muted-foreground">Your community meeting portal and financial workspace.</p>
+                    <p className="text-sm text-muted-foreground">
+                        {currentOrg ? `${currentOrg.name} Portal & Financial Workspace` : 'Your community meeting portal and financial workspace.'}
+                    </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                     <Button variant="outline" size="sm" onClick={() => setShowProfileHub(true)} className="text-xs gap-1.5 h-8">

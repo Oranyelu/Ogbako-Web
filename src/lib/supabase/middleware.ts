@@ -8,7 +8,7 @@ export async function updateSession(request: NextRequest) {
     })
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://idqmkyhwwxdzctlgfazo.supabase.co'
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy-anon-key'
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkcW1reWh3d3hkemN0bGdmYXpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3OTY0MDcsImV4cCI6MjEwNjM3MjQwN30.VbF0hksnFz6D-ZiySh-jKZsqCXyJpUYhx4b00DN4zYY'
 
     const supabase = createServerClient(
         url,
@@ -49,15 +49,16 @@ export async function updateSession(request: NextRequest) {
         if (path.startsWith('/_next') || path.startsWith('/api') || path.startsWith('/auth') || path.includes('.')) {
             return supabaseResponse
         }
-        const url = request.nextUrl.clone()
-        url.pathname = '/login'
-        return NextResponse.redirect(url)
+        const redirectUrl = request.nextUrl.clone()
+        redirectUrl.pathname = '/login'
+        return NextResponse.redirect(redirectUrl)
     }
 
-    if (user && (path === '/login' || path === '/register')) {
-        const url = request.nextUrl.clone()
-        url.pathname = '/dashboard'
-        return NextResponse.redirect(url)
+    // Authenticated users accessing root /, /login, or /register are sent directly to their dashboard
+    if (user && (path === '/' || path === '/login' || path === '/register')) {
+        const redirectUrl = request.nextUrl.clone()
+        redirectUrl.pathname = '/dashboard'
+        return NextResponse.redirect(redirectUrl)
     }
 
     return supabaseResponse

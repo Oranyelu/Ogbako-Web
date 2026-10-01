@@ -94,10 +94,12 @@ export function RegisterForm() {
         };
 
         try {
+            const redirectUrl = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined;
             const { data, error } = await supabase.auth.signUp({
                 email: values.email,
                 password: values.password,
                 options: {
+                    emailRedirectTo: redirectUrl,
                     data: {
                         full_name: values.name,
                         phone: values.phone,
@@ -107,7 +109,6 @@ export function RegisterForm() {
             });
 
             if (error) {
-                // If it's a fetch failed or API connectivity error, activate graceful local workspace fallback
                 if (error.message?.includes('fetch failed') || error.message?.includes('network')) {
                     throw new Error('fetch failed');
                 }
@@ -115,6 +116,21 @@ export function RegisterForm() {
             }
 
             if (data.user) {
+                // If signUp didn't return session directly, sign in to acquire session cookies
+                if (!data.session) {
+                    try {
+                        const { data: signInData } = await supabase.auth.signInWithPassword({
+                            email: values.email,
+                            password: values.password,
+                        });
+                        if (signInData?.user) {
+                            data.user = signInData.user;
+                        }
+                    } catch (signInErr) {
+                        console.warn("Auto-signin note:", signInErr);
+                    }
+                }
+
                 const finalUser = {
                     ...data.user,
                     user_metadata: {

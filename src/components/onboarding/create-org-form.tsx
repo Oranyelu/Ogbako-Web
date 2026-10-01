@@ -26,7 +26,6 @@ import {
     CardDescription,
     CardHeader,
     CardTitle,
-    CardFooter,
 } from '@/components/ui/card';
 import {
     Select,
@@ -36,8 +35,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ShieldCheck, Building2, Users, Sliders, Sparkles, CheckCircle2, ArrowRight } from 'lucide-react';
-import Link from 'next/link';
+import { Loader2, Building2, Sliders, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 
 const formSchema = z.object({
     name: z.string().min(2, {
@@ -62,10 +60,14 @@ const formSchema = z.object({
     requiresApproval: z.boolean(),
 });
 
+const isValidUuid = (val?: string): boolean =>
+    !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
 export function CreateOrgForm() {
     const router = useRouter();
-    const { user, createOrganizationLocally } = useAuthStore();
+    const { user, createOrganizationLocally, setActiveOrg } = useAuthStore();
     const [isLoading, setIsLoading] = useState(false);
+    const [formError, setFormError] = useState<string | null>(null);
     const [successOrg, setSuccessOrg] = useState<Organization | null>(null);
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -86,15 +88,9 @@ export function CreateOrgForm() {
         },
     });
 
-    const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const name = e.target.value;
-        form.setValue('name', name);
-        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-        form.setValue('slug', slug);
-    };
-
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setIsLoading(true);
+        setFormError(null);
         const supabase = createClient();
         const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
@@ -107,11 +103,16 @@ export function CreateOrgForm() {
             requiresApproval: values.requiresApproval,
         };
 
+        let baseSlug = (values.slug || values.name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        if (baseSlug.length < 2) {
+            baseSlug = 'org-' + Math.random().toString(36).substring(2, 7);
+        }
+
         const orgPayload = {
-            name: values.name,
-            slug: values.slug,
+            name: values.name.trim(),
+            slug: baseSlug,
             category: values.category,
-            description: values.description,
+            description: values.description?.trim() || '',
             meetingFrequency: values.meetingFrequency,
             currency: values.currency,
             joinCode,
@@ -124,7 +125,7 @@ export function CreateOrgForm() {
         };
 
         try {
-            // Attempt Supabase insert if logged in
+            // Determine active user ID
             let activeUserId = user?.id;
             if (!activeUserId) {
                 try {
@@ -135,37 +136,91 @@ export function CreateOrgForm() {
                 }
             }
 
-            if (activeUserId) {
-                const { data: orgData, error: orgError } = await supabase
+            const creatorUuid = isValidUuid(activeUserId) ? activeUserId : null;
+
+            // Attempt Supabase insert
+            let targetSlug = baseSlug;
+            let insertPayload = {
+                name: values.name.trim(),
+                slug: targetSlug,
+                category: values.category,
+                description: values.description?.trim() || null,
+                meeting_frequency: values.meetingFrequency,
+                currency: values.currency,
+                join_code: joinCode,
+                rules: rules,
+                created_by: creatorUuid,
+                is_verified_identity: false,
+            };
+
+            let { data: orgData, error: orgError } = await supabase
+                .from('organizations')
+                .insert(insertPayload)
+                .select()
+                .single();
+
+            // If slug conflict (code 23505), append random suffix and retry
+            if (orgError && orgError.code === '23505') {
+                targetSlug = `${baseSlug}-${Math.random().toString(36).substring(2, 6)}`;
+                insertPayload.slug = targetSlug;
+                const retryRes = await supabase
                     .from('organizations')
-                    .insert({
-                        name: values.name,
-                        slug: values.slug,
-                        created_by: activeUserId,
-                        join_code: joinCode,
-                    })
+                    .insert(insertPayload)
                     .select()
                     .single();
-
-                if (!orgError && orgData) {
-                    const created = createOrganizationLocally({
-                        ...orgPayload,
-                        id: orgData.id,
-                    });
-                    setSuccessOrg(created);
-                    setTimeout(() => {
-                        router.push('/dashboard');
-                        router.refresh();
-                    }, 1200);
-                    return;
-                }
+                orgData = retryRes.data;
+                orgError = retryRes.error;
             }
 
-            // Fallback: If Supabase fails or fetch failed, create locally in store
-            throw new Error('Supabase remote insert unavailable; falling back to local workspace.');
-        } catch (error: any) {
-            console.warn("Creating organization in local workspace:", error.message || error);
+            if (!orgError && orgData) {
+                // Ensure membership is registered in Supabase
+                if (creatorUuid) {
+                    try {
+                        await supabase.from('organization_members').upsert({
+                            organization_id: orgData.id,
+                            user_id: creatorUuid,
+                            role: 'OWNER',
+                        }, { onConflict: 'organization_id,user_id' });
+                    } catch (mErr) {
+                        console.warn("Membership sync note:", mErr);
+                    }
+                }
+
+                const created = createOrganizationLocally({
+                    ...orgPayload,
+                    id: orgData.id,
+                    slug: orgData.slug,
+                    joinCode: orgData.join_code || joinCode,
+                });
+
+                setActiveOrg(created.id);
+                setSuccessOrg(created);
+                setTimeout(() => {
+                    router.push('/dashboard');
+                    router.refresh();
+                }, 1200);
+                return;
+            }
+
+            // If Supabase encountered an error, check if it's network/offline
+            if (orgError) {
+                console.warn("Supabase org insert warning:", orgError);
+            }
+
+            // Graceful fallback to local workspace
             const localCreated = createOrganizationLocally(orgPayload);
+            setActiveOrg(localCreated.id);
+            setSuccessOrg(localCreated);
+            setTimeout(() => {
+                router.push('/dashboard');
+                router.refresh();
+            }, 1200);
+
+        } catch (error: any) {
+            console.error("Group creation error:", error);
+            // Fallback: create in local workspace so user is never blocked
+            const localCreated = createOrganizationLocally(orgPayload);
+            setActiveOrg(localCreated.id);
             setSuccessOrg(localCreated);
             setTimeout(() => {
                 router.push('/dashboard');
@@ -217,6 +272,13 @@ export function CreateOrgForm() {
                 </div>
             </CardHeader>
             <CardContent>
+                {formError && (
+                    <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-xs flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 shrink-0" />
+                        <span>{formError}</span>
+                    </div>
+                )}
+
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                         {/* Section 1: Basic Info */}
@@ -237,7 +299,12 @@ export function CreateOrgForm() {
                                                 <Input
                                                     placeholder="e.g. Umuahia Progressive Union"
                                                     {...field}
-                                                    onChange={handleNameChange}
+                                                    onChange={(e) => {
+                                                        field.onChange(e);
+                                                        const name = e.target.value;
+                                                        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+                                                        form.setValue('slug', slug, { shouldValidate: true });
+                                                    }}
                                                 />
                                             </FormControl>
                                             <FormMessage />
