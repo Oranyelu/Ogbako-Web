@@ -93,10 +93,11 @@ const PLANS: PlanInfo[] = [
             "Unlimited members",
             "Integrated Online Meetings (Video & Audio)",
             "AI Minutes taking & automated meeting summaries",
+            "24/7 Priority technical support",
+            "Further customization of app (Custom branding & meeting rules)",
+            "Identity & Name Protection (Protects from others copying your name & brand)",
             "Multi-branch chapter management",
-            "Dedicated community account manager",
             "Full financial audit trails & exportable reports",
-            "Priority 24/7 technical support",
         ]
     }
 ]

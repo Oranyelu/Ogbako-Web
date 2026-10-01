@@ -6,9 +6,10 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, CreditCard, Building2, Plus, Calendar, Users, FileText, Receipt, Shield, Eye, Settings, ArrowRight } from "lucide-react";
+import { Bell, CreditCard, Building2, Plus, Calendar, Users, FileText, Receipt, Shield, Eye, Settings, ArrowRight, User } from "lucide-react";
 import { CreateOrgForm } from "@/components/onboarding/create-org-form";
 import { JoinOrgForm } from "@/components/onboarding/join-org-form";
+import { PersonalHub } from "@/components/dashboard/personal-hub";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
@@ -122,31 +123,21 @@ export default function Page() {
     }, [activeOrgId, user]);
 
 
-    // 1. Unified Onboarding/Creation View (Identical to before)
-    if (organizations.length === 0 || isCreatingNew) {
+    const [showProfileHub, setShowProfileHub] = useState(false);
+
+    // 1. Unified Personal Hub when no organizations joined yet or explicitly viewed
+    if (organizations.length === 0 || showProfileHub) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] p-4 space-y-8 relative">
+            <div className="flex flex-col min-h-screen">
                 {organizations.length > 0 && (
-                    <Button variant="ghost" className="absolute top-4 left-4" onClick={() => setIsCreatingNew(false)}>
-                        Back to Selection
-                    </Button>
+                    <div className="p-4 border-b bg-muted/20 flex items-center justify-between">
+                        <Button variant="ghost" size="sm" onClick={() => setShowProfileHub(false)}>
+                            ← Back to {organizations.find(o => o.id === activeOrgId)?.name || 'Dashboard'}
+                        </Button>
+                        <Badge variant="outline">Personal Hub</Badge>
+                    </div>
                 )}
-                <div className="text-center space-y-2">
-                    <h1 className="text-3xl font-bold">{organizations.length === 0 ? `Welcome to Ogbako, ${userName}!` : 'Expand Your Network'}</h1>
-                    <p className="text-muted-foreground text-lg max-w-lg">
-                        {organizations.length === 0 ? "You don't belong to any organizations yet. Create or join one to get started." : "Create a new organization or join an existing one using an invite code."}
-                    </p>
-                </div>
-                <div className="w-full max-w-md">
-                    <Tabs defaultValue="create" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="create">Create New</TabsTrigger>
-                            <TabsTrigger value="join">Join Existing</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="create"><div className="mt-4"><CreateOrgForm /></div></TabsContent>
-                        <TabsContent value="join"><div className="mt-4"><JoinOrgForm /></div></TabsContent>
-                    </Tabs>
-                </div>
+                <PersonalHub />
             </div>
         );
     }
@@ -191,6 +182,10 @@ export default function Page() {
                     <p className="text-sm text-muted-foreground">Your community meeting portal and financial workspace.</p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
+                    <Button variant="outline" size="sm" onClick={() => setShowProfileHub(true)} className="text-xs gap-1.5 h-8">
+                        <User className="h-3.5 w-3.5 text-primary" />
+                        <span>My Personal Profile</span>
+                    </Button>
                     <Badge variant={transparencyMode ? "default" : "secondary"} className="flex items-center gap-1.5 py-1 px-3 text-xs">
                         <Eye className="h-3.5 w-3.5" />
                         <span>Transparency Mode: {transparencyMode ? "ON" : "OFF"}</span>

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Eye, EyeOff, Shield, CheckCircle2, Building2, CreditCard, Bell, Save, Loader2, ArrowRight } from "lucide-react"
+import { Eye, EyeOff, Shield, CheckCircle2, Building2, CreditCard, Bell, Save, Loader2, ArrowRight, Sliders, User } from "lucide-react"
 import Link from "next/link"
 
 export default function SettingsPage() {
@@ -33,12 +33,43 @@ export default function SettingsPage() {
     const [isSaving, setIsSaving] = useState(false)
     const [saveSuccess, setSaveSuccess] = useState(false)
 
+    const [minAge, setMinAge] = useState(activeOrg?.rules?.minAge || 18)
+    const [maxAge, setMaxAge] = useState(activeOrg?.rules?.maxAge || 100)
+    const [requiredGender, setRequiredGender] = useState(activeOrg?.rules?.requiredGender || 'ALL')
+    const [requiredNationality, setRequiredNationality] = useState(activeOrg?.rules?.requiredNationality || 'Nigerian')
+    const [rulesSaved, setRulesSaved] = useState(false)
+
     useEffect(() => {
         if (activeOrg) {
             setOrgName(activeOrg.name)
             setSlug(activeOrg.slug)
+            if (activeOrg.rules) {
+                setMinAge(activeOrg.rules.minAge || 18)
+                setMaxAge(activeOrg.rules.maxAge || 100)
+                setRequiredGender(activeOrg.rules.requiredGender || 'ALL')
+                setRequiredNationality(activeOrg.rules.requiredNationality || 'Nigerian')
+            }
         }
     }, [activeOrg])
+
+    const handleSaveRules = (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!isAdmin) return
+        const updated = organizations.map(org =>
+            org.id === activeOrgId ? {
+                ...org,
+                rules: {
+                    minAge: Number(minAge),
+                    maxAge: Number(maxAge),
+                    requiredGender: requiredGender as any,
+                    requiredNationality
+                }
+            } : org
+        )
+        setOrganizations(updated)
+        setRulesSaved(true)
+        setTimeout(() => setRulesSaved(false), 3000)
+    }
 
     const handleToggleTransparency = async () => {
         if (!isAdmin) {
@@ -250,6 +281,98 @@ export default function SettingsPage() {
                             <Button type="submit" disabled={isSaving} className="gap-2">
                                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                                 Save Changes
+                            </Button>
+                        </CardFooter>
+                    )}
+                </form>
+            </Card>
+
+            {/* Membership Rules & Criteria Configuration */}
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                                <Sliders className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-xl">Membership Eligibility Rules</CardTitle>
+                                <CardDescription>
+                                    Define demographic criteria required for new members joining this assembly.
+                                </CardDescription>
+                            </div>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                            {isAdmin ? "Admin Configurable" : "View Only"}
+                        </Badge>
+                    </div>
+                </CardHeader>
+                <form onSubmit={handleSaveRules}>
+                    <CardContent className="space-y-4">
+                        <div className="grid md:grid-cols-4 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="minAge">Minimum Age</Label>
+                                <Input
+                                    id="minAge"
+                                    type="number"
+                                    min={0}
+                                    max={120}
+                                    value={minAge}
+                                    onChange={(e) => setMinAge(Number(e.target.value))}
+                                    disabled={!isAdmin}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="maxAge">Maximum Age Limit</Label>
+                                <Input
+                                    id="maxAge"
+                                    type="number"
+                                    min={0}
+                                    max={120}
+                                    value={maxAge}
+                                    onChange={(e) => setMaxAge(Number(e.target.value))}
+                                    disabled={!isAdmin}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="reqGender">Gender Requirement</Label>
+                                <select
+                                    id="reqGender"
+                                    value={requiredGender}
+                                    onChange={(e) => setRequiredGender(e.target.value as any)}
+                                    disabled={!isAdmin}
+                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                >
+                                    <option value="ALL">All Welcome</option>
+                                    <option value="MALE">Men Only</option>
+                                    <option value="FEMALE">Women Only</option>
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="reqNat">Nationality</Label>
+                                <Input
+                                    id="reqNat"
+                                    value={requiredNationality}
+                                    onChange={(e) => setRequiredNationality(e.target.value)}
+                                    disabled={!isAdmin}
+                                    placeholder="e.g. Nigerian"
+                                />
+                            </div>
+                        </div>
+                    </CardContent>
+                    {isAdmin && (
+                        <CardFooter className="flex items-center justify-between border-t pt-4">
+                            <div>
+                                {rulesSaved && (
+                                    <span className="text-sm font-medium text-green-600 flex items-center gap-1.5">
+                                        <CheckCircle2 className="h-4 w-4" />
+                                        Membership rules updated!
+                                    </span>
+                                )}
+                            </div>
+                            <Button type="submit" variant="outline" className="gap-2">
+                                <Save className="h-4 w-4" />
+                                Update Rules
                             </Button>
                         </CardFooter>
                     )}
